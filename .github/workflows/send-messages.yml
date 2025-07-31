@@ -1,0 +1,99 @@
+name: Send Daily LINE Messages
+
+on:
+  schedule:
+    # 毎日午前9時（JST）に実行 = UTC 0時
+    - cron: '0 0 * * *'
+  workflow_dispatch: # 手動実行も可能
+
+jobs:
+  send-messages:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Send LINE Messages
+        run: |
+          # Supabaseから今日送信すべきメッセージを取得し、LINE APIで送信
+          curl -X POST \
+            -H "Content-Type: application/json" \
+            -H "apikey: ${{ secrets.SUPABASE_ANON_KEY }}" \
+            -H "Authorization: Bearer ${{ secrets.SUPABASE_ANON_KEY }}" \
+            -d '{
+              "query": "SELECT * FROM get_scheduled_messages_for_today()"
+            }' \
+            "${{ secrets.SUPABASE_URL }}/rest/v1/rpc/get_scheduled_messages_for_today" \
+            | jq -r '.[] | @base64' \
+            | while IFS= read -r row; do
+                # Base64デコード
+                message=$(echo "$row" | base64 -d)
+                
+                # JSON解析
+                user_id=$(echo "$message" | jq -r '.user_id')
+                display_name=$(echo "$message" | jq -r '.display_name')
+                day_number=$(echo "$message" | jq -r '.day_number')
+                message_text=$(echo "$message" | jq -r '.message_text')
+                image_url=$(echo "$message" | jq -r '.image_url // empty')
+                template_id=$(echo "$message" | jq -r '.template_id')
+                
+                # メッセージ内容を個人化
+                personalized_message=$(echo "$message_text" | sed "s/○○/$display_name/g")
+                
+                # LINEメッセージ構築
+                if [ -n "$image_url" ] && [ "$image_url" != "null" ]; then
+                  # 画像付きメッセージ
+                  line_messages="[
+                    {\"type\":\"image\",\"originalContentUrl\":\"$image_url\",\"previewImageUrl\":\"$image_url\"},
+                    {\"type\":\"text\",\"text\":\"$personalized_message\"}
+                  ]"
+                else
+                  # テキストのみ
+                  line_messages="[{\"type\":\"text\",\"text\":\"$personalized_message\"}]"
+                fi
+                
+                # LINE APIでメッセージ送信
+                response=$(curl -s -w "%{http_code}" -X POST \
+                  -H "Content-Type: application/json" \
+                  -H "Authorization: Bearer ${{ secrets.LINE_CHANNEL_ACCESS_TOKEN }}" \
+                  -d "{\"to\":\"$user_id\",\"messages\":$line_messages}" \
+                  "https://api.line.me/v2/bot/message/push")
+                
+                http_code="${response: -3}"
+                
+                # 送信ログを記録
+                if [ "$http_code" = "200" ]; then
+                  echo "✅ 送信成功: $user_id ($display_name) - ${day_number}日目"
+                  # 成功ログをSupabaseに記録
+                  curl -X POST \
+                    -H "Content-Type: application/json" \
+                    -H "apikey: ${{ secrets.SUPABASE_ANON_KEY }}" \
+                    -H "Authorization: Bearer ${{ secrets.SUPABASE_ANON_KEY }}" \
+                    -d "{
+                      \"p_user_id\": \"$user_id\",
+                      \"p_day_number\": $day_number,
+                      \"p_template_id\": $template_id,
+                      \"p_success\": true,
+                      \"p_error_message\": null,
+                      \"p_line_message_id\": null
+                    }" \
+                    "${{ secrets.SUPABASE_URL }}/rest/v1/rpc/log_message_send"
+                else
+                  echo "❌ 送信失敗: $user_id ($display_name) - HTTP $http_code"
+                  # 失敗ログをSupabaseに記録
+                  curl -X POST \
+                    -H "Content-Type: application/json" \
+                    -H "apikey: ${{ secrets.SUPABASE_ANON_KEY }}" \
+                    -H "Authorization: Bearer ${{ secrets.SUPABASE_ANON_KEY }}" \
+                    -d "{
+                      \"p_user_id\": \"$user_id\",
+                      \"p_day_number\": $day_number,
+                      \"p_template_id\": $template_id,
+                      \"p_success\": false,
+                      \"p_error_message\": \"HTTP $http_code\",
+                      \"p_line_message_id\": null
+                    }" \
+                    "${{ secrets.SUPABASE_URL }}/rest/v1/rpc/log_message_send"
+                fi
+                
+                # API制限回避のため少し待機
+                sleep 0.1
+              done
