@@ -1,0 +1,18 @@
+# Supabase Configuration File
+# このファイルはEdge Functionsの個別設定を管理します
+
+# 自動メッセージ送信用関数 - GitHub Actionsから呼び出されるためJWT認証を無効化
+[functions.line-auto-message-sender]
+verify_jwt = false
+
+# LINEウェブフック処理用関数 - LINEからのWebhookはJWT認証を持たないため無効化
+[functions.line-webhook-handler]
+verify_jwt = false
+
+# LINEウェブフック処理用関数（公開版） - LINEからのWebhookはJWT認証を持たないため無効化
+[functions.line-webhook-public]
+verify_jwt = false
+
+# Webhookテスト用関数 - テスト目的のため認証を無効化
+[functions.webhook-test]
+verify_jwt = false
