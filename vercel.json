@@ -1,0 +1,16 @@
+{
+  "functions": {
+    "api/webhook.js": {
+      "maxDuration": 30
+    },
+    "api/send-messages.js": {
+      "maxDuration": 300
+    }
+  },
+  "crons": [
+    {
+      "path": "/api/send-messages",
+      "schedule": "0 9 * * *"
+    }
+  ]
+}
