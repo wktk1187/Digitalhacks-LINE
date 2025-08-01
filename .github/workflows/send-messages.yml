@@ -15,20 +15,26 @@ jobs:
         run: |
           # line-auto-message-sender Edge Functionを呼び出し
           echo "🔄 自動メッセージ送信を開始..."
+          echo "📡 URL: ${SUPABASE_URL}/functions/v1/line-auto-message-sender"
           
-          response=$(curl -s -w "%{http_code}" -X POST \
-            "${{ secrets.SUPABASE_URL }}/functions/v1/line-auto-message-sender" \
+          # curlでEdge Functionを呼び出し
+          response=$(curl -s -w "HTTPSTATUS:%{http_code}" -X POST \
+            "${SUPABASE_URL}/functions/v1/line-auto-message-sender" \
             -H "Content-Type: application/json")
           
-          http_code="${response: -3}"
-          response_body="${response%???}"
+          # HTTPステータスコードと レスポンスボディを分離
+          http_code=$(echo "$response" | tr -d '\n' | sed -e 's/.*HTTPSTATUS://')
+          response_body=$(echo "$response" | sed -e 's/HTTPSTATUS:.*//g')
+          
+          echo "📊 HTTP Status: $http_code"
+          echo "📄 Response: $response_body"
           
           if [ "$http_code" = "200" ]; then
             echo "✅ Edge Function実行成功"
-            echo "$response_body" | jq '.'
+            echo "📨 メッセージ送信処理完了"
           else
             echo "❌ Edge Function実行失敗: HTTP $http_code"
-            echo "$response_body"
+            echo "🔍 レスポンス詳細: $response_body"
             exit 1
           fi
         env:
