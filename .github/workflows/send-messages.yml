@@ -16,12 +16,19 @@ jobs:
           # line-auto-message-sender Edge Functionを呼び出し
           echo "🔄 自動メッセージ送信を開始..."
           
-          # URLを確認
+          # URLを確認とデバッグ情報
           if [ -z "$SUPABASE_URL" ]; then
             echo "❌ SUPABASE_URL is not set"
             exit 1
           fi
           
+          # URLの長さとフォーマットを確認
+          echo "📏 SUPABASE_URL length: ${#SUPABASE_URL}"
+          echo "🔍 First 30 chars: ${SUPABASE_URL:0:30}"
+          echo "🔍 Last 10 chars: ${SUPABASE_URL: -10}"
+          
+          # 改行や空白を削除
+          SUPABASE_URL=$(echo "$SUPABASE_URL" | tr -d '\r\n' | xargs)
           FULL_URL="${SUPABASE_URL}/functions/v1/line-auto-message-sender"
           echo "📡 URL: $FULL_URL"
           
