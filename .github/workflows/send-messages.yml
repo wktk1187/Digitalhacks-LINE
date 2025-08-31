@@ -2,8 +2,8 @@ name: Send Daily LINE Messages
 
 on:
   schedule:
-    # 毎日午前9時（JST）に実行 = UTC 0時
-    - cron: '0 0 * * *'
+    # 毎日正午（JST 12:00）に実行 = UTC 3時
+    - cron: '0 3 * * *'
   workflow_dispatch: # 手動実行も可能
 
 jobs:
